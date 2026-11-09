@@ -1,0 +1,707 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Bawan Gambling — Lucky Wheel (Pi Network)</title>
+<!--
+  ============================================================
+  BAWAN GAMBLING — Lucky Wheel (example / demo)
+  Currency: Pi Network (π) only.
+
+  This is a FRONT-END DEMO. No real Pi is transferred.
+  Balance, wallet and history are simulated in localStorage.
+
+  To go live on Pi Network you would need:
+    1. An approved Pi Developer Portal app
+    2. <script src="https://sdk.minepi.com/pi-sdk.js"></script>
+    3. Pi.init({ version: "2.0", sandbox: true })
+    4. Real payments via Pi.createPayment() WITH a backend that
+       approves / completes payments through the Pi Platform API
+    5. A gambling license in your jurisdiction (18+ only)
+  The code below already includes guarded hooks for the real
+  Pi SDK (window.Pi) — outside the Pi Browser it falls back to
+  demo mode automatically.
+  ============================================================
+-->
+<style>
+  :root {
+    --bg: #0e0a17;
+    --bg-2: #171029;
+    --card: #1d1430;
+    --card-2: #251a3e;
+    --border: #372a55;
+    --text: #f2edfa;
+    --muted: #a99cc4;
+    --pi: #7d4698;          /* Pi Network purple */
+    --pi-light: #a86fd0;
+    --gold: #f5b942;
+    --gold-2: #ffd76a;
+    --green: #3ddc84;
+    --red: #ff5d6c;
+    --radius: 14px;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: radial-gradient(1200px 600px at 50% -10%, #2a1b4d 0%, var(--bg) 55%);
+    color: var(--text);
+    font-family: "Segoe UI", system-ui, -apple-system, Roboto, Arial, sans-serif;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+  .wrap { width: 100%; max-width: 1060px; margin: 0 auto; padding: 0 16px; }
+
+  /* ---------- header ---------- */
+  header {
+    border-bottom: 1px solid var(--border);
+    background: rgba(14, 10, 23, 0.85);
+    position: sticky; top: 0; z-index: 50;
+    backdrop-filter: blur(8px);
+  }
+  .header-in {
+    display: flex; align-items: center; gap: 12px;
+    padding: 14px 0; flex-wrap: wrap;
+  }
+  .logo { display: flex; align-items: center; gap: 10px; margin-right: auto; }
+  .logo-badge {
+    width: 42px; height: 42px; border-radius: 50%;
+    background: linear-gradient(135deg, var(--pi) 0%, #4b2a63 100%);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 24px; font-weight: 800; color: #fff;
+    border: 2px solid var(--gold);
+    box-shadow: 0 0 18px rgba(168, 111, 208, 0.45);
+  }
+  .logo-name { font-size: 20px; font-weight: 800; letter-spacing: 3px; }
+  .logo-name span { color: var(--gold); }
+  .logo-sub { font-size: 10px; color: var(--muted); letter-spacing: 4px; }
+  .balance-chip {
+    display: flex; align-items: center; gap: 8px;
+    background: var(--card); border: 1px solid var(--border);
+    padding: 9px 14px; border-radius: 999px;
+    font-weight: 700; font-size: 15px;
+  }
+  .balance-chip .pi-coin {
+    width: 22px; height: 22px; border-radius: 50%;
+    background: radial-gradient(circle at 30% 30%, var(--pi-light), var(--pi));
+    color: #fff; font-size: 13px; font-weight: 800;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .btn {
+    border: none; cursor: pointer; border-radius: 10px;
+    padding: 10px 18px; font-size: 14px; font-weight: 700;
+    color: #fff; background: var(--pi);
+    transition: transform 0.12s ease, filter 0.12s ease;
+  }
+  .btn:hover { filter: brightness(1.15); transform: translateY(-1px); }
+  .btn:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
+  .btn.gold { background: linear-gradient(135deg, var(--gold) 0%, #e09a1f 100%); color: #241a05; }
+  .btn.ghost { background: transparent; border: 1px solid var(--border); color: var(--text); }
+  .btn.big { width: 100%; padding: 14px; font-size: 17px; letter-spacing: 2px; }
+
+  /* ---------- demo strip ---------- */
+  .demo-strip {
+    background: rgba(245, 185, 66, 0.1);
+    border-bottom: 1px solid rgba(245, 185, 66, 0.25);
+    color: var(--gold-2);
+    font-size: 12px; text-align: center; padding: 7px 12px;
+  }
+
+  /* ---------- game layout ---------- */
+  main { flex: 1; padding: 26px 0 40px; }
+  .hero { text-align: center; margin-bottom: 22px; }
+  .hero h1 { font-size: 30px; letter-spacing: 5px; }
+  .hero h1 em { color: var(--gold); font-style: normal; }
+  .hero p { color: var(--muted); font-size: 14px; margin-top: 6px; }
+  .rtp-badge {
+    display: inline-block; margin-top: 10px;
+    background: var(--card-2); border: 1px solid var(--border);
+    color: var(--green); font-size: 12px; font-weight: 700;
+    padding: 5px 12px; border-radius: 999px;
+  }
+
+  .game-grid {
+    display: grid; grid-template-columns: 1.15fr 0.85fr;
+    gap: 18px; align-items: start;
+  }
+  @media (max-width: 860px) { .game-grid { grid-template-columns: 1fr; } }
+
+  .card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 18px;
+  }
+  .card h3 {
+    font-size: 13px; letter-spacing: 2px; color: var(--muted);
+    text-transform: uppercase; margin-bottom: 12px;
+  }
+
+  /* ---------- wheel ---------- */
+  .wheel-zone { display: flex; flex-direction: column; align-items: center; gap: 14px; }
+  .wheel-box {
+    position: relative; width: 100%; max-width: 440px; aspect-ratio: 1;
+  }
+  .wheel-box canvas { width: 100%; height: 100%; display: block; }
+  .pointer {
+    position: absolute; top: -6px; left: 50%; transform: translateX(-50%);
+    width: 0; height: 0; z-index: 5;
+    border-left: 14px solid transparent;
+    border-right: 14px solid transparent;
+    border-top: 26px solid var(--gold);
+    filter: drop-shadow(0 3px 4px rgba(0, 0, 0, 0.6));
+  }
+  .wheel-hub {
+    position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+    width: 88px; height: 88px; border-radius: 50%;
+    background: radial-gradient(circle at 30% 30%, #4b2a63, var(--pi));
+    border: 3px solid var(--gold);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    font-weight: 800; z-index: 4; box-shadow: 0 0 24px rgba(125, 70, 152, 0.6);
+  }
+  .wheel-hub .pi { font-size: 30px; }
+  .wheel-hub .rtp { font-size: 9px; color: var(--gold-2); letter-spacing: 1px; }
+
+  /* ---------- bet panel ---------- */
+  .bet-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+  .chip {
+    background: var(--card-2); border: 1px solid var(--border);
+    color: var(--text); border-radius: 8px; padding: 8px 12px;
+    font-size: 13px; font-weight: 700; cursor: pointer;
+  }
+  .chip:hover { border-color: var(--pi-light); }
+  .bet-input-wrap { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; }
+  .bet-input-wrap input {
+    flex: 1; background: var(--bg-2); border: 1px solid var(--border);
+    color: var(--text); border-radius: 10px; padding: 12px 14px;
+    font-size: 16px; font-weight: 700; outline: none; min-width: 0;
+  }
+  .bet-input-wrap input:focus { border-color: var(--pi-light); }
+  .pi-suffix { color: var(--gold); font-weight: 800; font-size: 18px; }
+  .hint { font-size: 12px; color: var(--muted); margin-top: -6px; margin-bottom: 12px; }
+
+  .result {
+    min-height: 54px; border-radius: 10px; display: flex;
+    align-items: center; justify-content: center; gap: 8px;
+    font-weight: 800; font-size: 16px; text-align: center;
+    background: var(--bg-2); border: 1px dashed var(--border);
+    color: var(--muted); padding: 10px; margin-top: 14px;
+  }
+  .result.win { background: rgba(61, 220, 132, 0.1); border: 1px solid rgba(61, 220, 132, 0.5); color: var(--green); }
+  .result.lose { background: rgba(255, 93, 108, 0.08); border: 1px solid rgba(255, 93, 108, 0.45); color: var(--red); }
+  .result.jackpot { background: rgba(245, 185, 66, 0.12); border: 1px solid var(--gold); color: var(--gold-2); animation: pulse 0.9s ease infinite; }
+  @keyframes pulse { 50% { box-shadow: 0 0 22px rgba(245, 185, 66, 0.45); } }
+
+  /* ---------- tables / history ---------- */
+  .below-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-top: 18px; }
+  @media (max-width: 860px) { .below-grid { grid-template-columns: 1fr; } }
+  table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  th, td { text-align: left; padding: 8px 6px; border-bottom: 1px solid var(--border); }
+  th { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 1px; }
+  td.num, th.num { text-align: right; }
+  .swatch { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 8px; vertical-align: middle; }
+  .mult { font-weight: 800; }
+  .pos { color: var(--green); font-weight: 700; }
+  .neg { color: var(--red); font-weight: 700; }
+  .hist-scroll { max-height: 260px; overflow-y: auto; }
+  .hist-scroll::-webkit-scrollbar { width: 6px; }
+  .hist-scroll::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+  .empty { color: var(--muted); font-size: 13px; padding: 12px 4px; }
+
+  footer {
+    border-top: 1px solid var(--border);
+    background: var(--bg-2);
+    padding: 16px 0 calc(16px + env(safe-area-inset-bottom, 0px));
+    font-size: 12px; color: var(--muted); text-align: center;
+  }
+  footer b { color: var(--text); }
+  .age { display: inline-block; border: 1px solid var(--red); color: var(--red); border-radius: 6px; padding: 1px 7px; font-weight: 800; margin: 0 4px; }
+
+  /* ---------- wallet modal ---------- */
+  .overlay {
+    position: fixed; inset: 0; background: rgba(5, 3, 10, 0.72);
+    display: none; align-items: center; justify-content: center; z-index: 100;
+    padding: 16px;
+  }
+  .overlay.show { display: flex; }
+  .modal {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: var(--radius); width: 100%; max-width: 420px;
+    padding: 22px; max-height: 90vh; overflow-y: auto;
+  }
+  .modal h2 { font-size: 18px; margin-bottom: 4px; }
+  .modal .sub { color: var(--muted); font-size: 12.5px; margin-bottom: 16px; }
+  .field { margin-bottom: 12px; }
+  .field label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 5px; }
+  .field input {
+    width: 100%; background: var(--bg-2); border: 1px solid var(--border);
+    color: var(--text); border-radius: 9px; padding: 11px 12px; font-size: 14px; outline: none;
+  }
+  .field input:focus { border-color: var(--pi-light); }
+  .wallet-addr {
+    background: var(--bg-2); border: 1px solid var(--border); border-radius: 9px;
+    padding: 10px 12px; font-size: 12px; color: var(--gold-2);
+    word-break: break-all; margin-bottom: 14px; font-family: monospace;
+  }
+  .modal-note { font-size: 11.5px; color: var(--muted); background: var(--bg-2); border-radius: 8px; padding: 9px 11px; margin-top: 14px; line-height: 1.5; }
+  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .close-x {
+    float: right; background: none; border: none; color: var(--muted);
+    font-size: 22px; cursor: pointer; line-height: 1;
+  }
+  .toast {
+    position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%);
+    background: var(--card-2); border: 1px solid var(--pi-light);
+    color: var(--text); padding: 11px 18px; border-radius: 10px;
+    font-size: 13.5px; font-weight: 600; z-index: 200;
+    opacity: 0; pointer-events: none; transition: opacity 0.25s ease;
+  }
+  .toast.show { opacity: 1; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap header-in">
+    <div class="logo">
+      <div class="logo-badge">π</div>
+      <div>
+        <div class="logo-name">BAWAN <span>GAMBLING</span></div>
+        <div class="logo-sub">POWERED BY PI NETWORK</div>
+      </div>
+    </div>
+    <div class="balance-chip"><span class="pi-coin">π</span><span id="balanceTop">25.00</span>&nbsp;PI</div>
+    <button class="btn ghost" id="walletBtn">Wallet</button>
+  </div>
+</header>
+
+<div class="demo-strip">Example / demo build — no real Pi is transferred. Odds shown are typical industry rates. <span class="age">18+</span> Play responsibly.</div>
+
+<main class="wrap">
+  <div class="hero">
+    <h1>LUCKY <em>WHEEL</em></h1>
+    <p>Place your bet in Pi, spin the wheel, win up to <b>10×</b> your bet.</p>
+    <span class="rtp-badge">RTP 95.5% · House edge 4.5% · Min 0.1 π · Max 100 π</span>
+  </div>
+
+  <div class="game-grid">
+    <!-- WHEEL -->
+    <div class="card wheel-zone">
+      <div class="wheel-box">
+        <div class="pointer"></div>
+        <canvas id="wheel" width="640" height="640"></canvas>
+        <div class="wheel-hub"><span class="pi">π</span><span class="rtp">95.5%</span></div>
+      </div>
+      <div class="result" id="result">Place a bet and press SPIN</div>
+    </div>
+
+    <!-- BET PANEL -->
+    <div class="card">
+      <h3>Your bet</h3>
+      <div class="bet-row">
+        <button class="chip" data-bet="0.1">0.1 π</button>
+        <button class="chip" data-bet="0.5">0.5 π</button>
+        <button class="chip" data-bet="1">1 π</button>
+        <button class="chip" data-bet="5">5 π</button>
+        <button class="chip" data-bet="10">10 π</button>
+        <button class="chip" data-bet="max">MAX</button>
+      </div>
+      <div class="bet-input-wrap">
+        <input id="betInput" type="number" min="0.1" max="100" step="0.1" value="1" />
+        <span class="pi-suffix">π</span>
+      </div>
+      <div class="hint">Min 0.1 π · Max 100 π · Max win 1,000 π (10× on 100 π)</div>
+      <button class="btn gold big" id="spinBtn">SPIN THE WHEEL</button>
+      <div class="result" id="resultMobile" style="display:none"></div>
+
+      <h3 style="margin-top:20px">Last spins</h3>
+      <div class="hist-scroll">
+        <table>
+          <thead><tr><th>Bet</th><th>Result</th><th class="num">Payout</th></tr></thead>
+          <tbody id="historyBody"><tr><td colspan="3" class="empty">No spins yet — good luck!</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ODDS + FAIRNESS -->
+  <div class="below-grid">
+    <div class="card">
+      <h3>Payouts &amp; odds (typical rates)</h3>
+      <table>
+        <thead><tr><th>Multiplier</th><th class="num">Chance</th><th class="num">Payout on 1 π</th></tr></thead>
+        <tbody id="oddsBody"></tbody>
+      </table>
+    </div>
+    <div class="card">
+      <h3>How it works</h3>
+      <p style="font-size:13.5px; color:var(--muted); line-height:1.7">
+        Every slice on the wheel is sized exactly to its true winning chance, so what
+        you see is what you get. The expected return to player (RTP) is
+        <b style="color:var(--green)">95.5%</b> — meaning that on average 95.5% of all
+        wagered Pi is paid back to players as prizes, in line with typical online
+        wheel games. Wins are credited to your balance instantly, and you can withdraw
+        to your Pi wallet at any time (min 1 π).
+      </p>
+      <p style="font-size:13.5px; color:var(--muted); line-height:1.7; margin-top:10px">
+        This page runs entirely in your browser: balance, wallet and history are kept
+        in <code>localStorage</code> as a demo. Hooks for the real Pi SDK
+        (<code>window.Pi</code>) are included — see the comment at the top of the file.
+      </p>
+    </div>
+  </div>
+</main>
+
+<footer>
+  <div class="wrap">
+    <b>BAWAN GAMBLING</b> · Lucky Wheel · Pi Network only<br/>
+    <span class="age">18+</span> Gambling can be addictive — play responsibly. Demo example, not a licensed operator.
+  </div>
+</footer>
+
+<!-- WALLET MODAL -->
+<div class="overlay" id="walletModal">
+  <div class="modal">
+    <button class="close-x" id="closeWallet">&times;</button>
+    <h2>Pi Wallet</h2>
+    <p class="sub">Bawan Gambling supports <b>Pi Network only</b>.</p>
+
+    <div id="walletArea">
+      <div class="wallet-addr" id="walletAddr">Not connected</div>
+      <button class="btn big" id="connectBtn" style="width:100%">Connect Pi Wallet</button>
+    </div>
+
+    <div id="walletActions" style="display:none">
+      <div class="field">
+        <label for="depositAmt">Deposit amount (π)</label>
+        <div class="row2">
+          <input id="depositAmt" type="number" min="0.1" step="0.1" value="10" />
+          <button class="btn" id="depositBtn">Deposit</button>
+        </div>
+      </div>
+      <div class="field">
+        <label for="withdrawAmt">Withdraw amount (π) — min 1 π</label>
+        <div class="row2">
+          <input id="withdrawAmt" type="number" min="1" step="0.1" value="1" />
+          <button class="btn ghost" id="withdrawBtn">Withdraw</button>
+        </div>
+      </div>
+      <div class="modal-note">
+        <b>Demo mode:</b> deposits/withdrawals are simulated locally.
+        In the Pi Browser with the real SDK, “Connect” triggers
+        <code>Pi.authenticate()</code> and deposits go through
+        <code>Pi.createPayment()</code> (server approval required).
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* =====================================================
+   BAWAN GAMBLING — Lucky Wheel
+   Currency: Pi (π) only · Demo mode outside Pi Browser
+   ===================================================== */
+
+/* ---------- 1. Game math (typical gambling rates) ----------
+   Slice sizes on the wheel = true probability of each outcome.
+   Expected return = Σ prob × multiplier = 0.955 → RTP 95.5%  */
+const SLICES = [
+  // order around the wheel (alternating big/small for looks)
+  { label: "0×",    m: 0,    p: 28.5, color: "#241d33", text: "#8a8494" },
+  { label: "1.5×",  m: 1.5,  p: 10,   color: "#9553b8", text: "#ffffff" },
+  { label: "0.5×",  m: 0.5,  p: 16,   color: "#5e3d8a", text: "#ffffff" },
+  { label: "3×",    m: 3,    p: 4,    color: "#e0a52e", text: "#241a05" },
+  { label: "0.2×",  m: 0.2,  p: 18,   color: "#4a3268", text: "#ffffff" },
+  { label: "5×",    m: 5,    p: 2.5,  color: "#f0bc42", text: "#241a05" },
+  { label: "1.2×",  m: 1.2,  p: 12,   color: "#7d4698", text: "#ffffff" },
+  { label: "10×",   m: 10,   p: 1.5,  color: "#ffd54a", text: "#241a05" },
+  { label: "2×",    m: 2,    p: 7.5,  color: "#c98a2e", text: "#241a05" },
+];
+const TOTAL_P   = SLICES.reduce((s, x) => s + x.p, 0);   // = 100
+const RTP       = SLICES.reduce((s, x) => s + (x.p / 100) * x.m, 0); // = 0.955
+const MIN_BET   = 0.1, MAX_BET = 100;
+
+/* ---------- 2. State (localStorage demo wallet) ---------- */
+const store = {
+  get balance()    { return parseFloat(localStorage.getItem("bawan_balance") ?? "25"); },
+  set balance(v)   { localStorage.setItem("bawan_balance", v.toFixed(2)); },
+  get wallet()     { return JSON.parse(localStorage.getItem("bawan_wallet") ?? "null"); },
+  set wallet(w)    { localStorage.setItem("bawan_wallet", JSON.stringify(w)); },
+  get history()    { return JSON.parse(localStorage.getItem("bawan_history") ?? "[]"); },
+  set history(h)   { localStorage.setItem("bawan_history", JSON.stringify(h.slice(0, 20))); },
+};
+
+const $ = (id) => document.getElementById(id);
+const fmt = (n) => n.toFixed(2);
+
+function refreshUI() {
+  $("balanceTop").textContent = fmt(store.balance);
+  const h = store.history;
+  $("historyBody").innerHTML = h.length
+    ? h.map((r) => {
+        const net = r.payout - r.bet;
+        const cls = net > 0 ? "pos" : net < 0 ? "neg" : "";
+        const sign = net > 0 ? "+" : "";
+        const res = r.m === 0 ? "0× (lost)" : r.m + "×";
+        return `<tr><td>${fmt(r.bet)} π</td><td class="mult">${res}</td>
+                <td class="num ${cls}">${sign}${fmt(net)} π</td></tr>`;
+      }).join("")
+    : `<tr><td colspan="3" class="empty">No spins yet — good luck!</td></tr>`;
+}
+
+function toast(msg) {
+  const t = $("toast");
+  t.textContent = msg;
+  t.classList.add("show");
+  clearTimeout(t._t);
+  t._t = setTimeout(() => t.classList.remove("show"), 2200);
+}
+
+/* ---------- 3. Draw the wheel ---------- */
+const canvas = $("wheel"), ctx = canvas.getContext("2d");
+const TAU = Math.PI * 2;
+let rotation = 0; // current wheel rotation (radians)
+
+// cumulative slice angles [start, end) in wheel-local coordinates
+const bounds = [];
+(() => {
+  let acc = 0;
+  for (const s of SLICES) {
+    const a = (s.p / TOTAL_P) * TAU;
+    bounds.push([acc, acc + a]);
+    acc += a;
+  }
+})();
+
+function drawWheel() {
+  const cx = 320, cy = 320, R = 300;
+  ctx.clearRect(0, 0, 640, 640);
+
+  // outer ring
+  ctx.beginPath(); ctx.arc(cx, cy, R + 14, 0, TAU);
+  ctx.fillStyle = "#2a1f45"; ctx.fill();
+  ctx.beginPath(); ctx.arc(cx, cy, R + 14, 0, TAU);
+  ctx.lineWidth = 4; ctx.strokeStyle = "#f5b942"; ctx.stroke();
+
+  // small bulbs around the rim
+  for (let i = 0; i < 24; i++) {
+    const a = (i / 24) * TAU;
+    ctx.beginPath();
+    ctx.arc(cx + Math.cos(a) * (R + 7), cy + Math.sin(a) * (R + 7), 3.4, 0, TAU);
+    ctx.fillStyle = i % 2 ? "#ffd76a" : "#a86fd0"; ctx.fill();
+  }
+
+  // slices
+  SLICES.forEach((s, i) => {
+    const [a0, a1] = bounds[i];
+    const start = a0 + rotation, end = a1 + rotation;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.arc(cx, cy, R, start, end);
+    ctx.closePath();
+    ctx.fillStyle = s.color; ctx.fill();
+    ctx.lineWidth = 2; ctx.strokeStyle = "#0e0a17"; ctx.stroke();
+
+    // radial label
+    const mid = (a0 + a1) / 2 + rotation;
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate(mid);
+    ctx.textAlign = "right";
+    ctx.textBaseline = "middle";
+    ctx.fillStyle = s.text;
+    ctx.font = "800 26px 'Segoe UI', system-ui, sans-serif";
+    ctx.fillText(s.label, R - 22, 0);
+    ctx.restore();
+  });
+
+  // center hole (hub drawn in HTML on top)
+  ctx.beginPath(); ctx.arc(cx, cy, 66, 0, TAU);
+  ctx.fillStyle = "#0e0a17"; ctx.fill();
+}
+
+/* ---------- 4. Spin logic ---------- */
+let spinning = false;
+
+function weightedPick() {
+  let r = Math.random() * TOTAL_P;
+  for (let i = 0; i < SLICES.length; i++) {
+    r -= SLICES[i].p;
+    if (r < 0) return i;
+  }
+  return SLICES.length - 1;
+}
+
+function spin() {
+  if (spinning) return;
+  const bet = parseFloat($("betInput").value);
+  if (!(bet >= MIN_BET) || bet > MAX_BET) { toast(`Bet must be ${MIN_BET}–${MAX_BET} π`); return; }
+  if (bet > store.balance) {
+    setResult("Not enough Pi — open the Wallet to deposit.", "lose");
+    openWallet();
+    return;
+  }
+
+  spinning = true;
+  $("spinBtn").disabled = true;
+  $("betInput").disabled = true;
+  setResult("Spinning…", "");
+
+  const target = weightedPick();
+
+  // land the chosen slice's middle under the top pointer (-90°)
+  const [a0, a1] = bounds[target];
+  const mid = (a0 + a1) / 2;
+  const jitter = (Math.random() - 0.5) * (a1 - a0) * 0.6;
+  const pointer = 1.5 * Math.PI; // -90° in [0, TAU)
+  const finalR =
+    rotation +
+    6 * TAU +                                            // 6 full turns
+    ((pointer - (mid + jitter + rotation)) % TAU + TAU) % TAU;
+
+  const startR = rotation, dur = 4600, t0 = performance.now();
+
+  function frame(now) {
+    const t = Math.min(1, (now - t0) / dur);
+    const ease = 1 - Math.pow(1 - t, 4); // ease-out quartic
+    rotation = startR + (finalR - startR) * ease;
+    drawWheel();
+    if (t < 1) requestAnimationFrame(frame);
+    else settle(bet, target);
+  }
+  requestAnimationFrame(frame);
+}
+
+function settle(bet, idx) {
+  const s = SLICES[idx];
+  const payout = bet * s.m;
+  store.balance = Math.max(0, store.balance - bet + payout);
+
+  const h = store.history;
+  h.unshift({ t: Date.now(), bet, m: s.m, payout });
+  store.history = h;
+
+  const net = payout - bet;
+  if (s.m === 10)      setResult(`★ JACKPOT! 10× — you won ${fmt(payout)} π (+${fmt(net)}) ★`, "jackpot");
+  else if (net > 0)    setResult(`${s.label} — you won ${fmt(payout)} π (+${fmt(net)} π)`, "win");
+  else if (net === 0)  setResult(`${s.label} — bet returned`, "");
+  else if (s.m === 0)  setResult(`0× — lost ${fmt(bet)} π. Try again!`, "lose");
+  else                 setResult(`${s.label} — returned ${fmt(payout)} π (−${fmt(-net)} π)`, "lose");
+
+  refreshUI();
+  spinning = false;
+  $("spinBtn").disabled = false;
+  $("betInput").disabled = false;
+}
+
+function setResult(msg, cls) {
+  const el = window.innerWidth < 860 ? $("resultMobile") : $("result");
+  $("resultMobile").style.display = window.innerWidth < 860 ? "flex" : "none";
+  const both = [$("result"), $("resultMobile")];
+  both.forEach((e) => { e.className = "result" + (cls ? " " + cls : ""); });
+  el.textContent = msg;
+}
+
+/* ---------- 5. Pi wallet (demo + real SDK hooks) ---------- */
+const hasRealPi = typeof window !== "undefined" && !!window.Pi;
+
+function randomAddress() {
+  const A = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
+  let a = "G";
+  for (let i = 0; i < 55; i++) a += A[Math.floor(Math.random() * A.length)];
+  return a;
+}
+
+function openWallet() {
+  $("walletModal").classList.add("show");
+  const w = store.wallet;
+  $("walletArea").style.display = w ? "none" : "block";
+  $("walletActions").style.display = w ? "block" : "none";
+  if (w) $("walletAddr").textContent = `${w.username ? "@" + w.username + " · " : ""}${w.address}${hasRealPi ? "" : "  (demo)"}`;
+}
+
+$("walletBtn").onclick = openWallet;
+$("closeWallet").onclick = () => $("walletModal").classList.remove("show");
+$("walletModal").addEventListener("click", (e) => { if (e.target === e.currentTarget) e.currentTarget.classList.remove("show"); });
+
+$("connectBtn").onclick = async () => {
+  if (hasRealPi) {
+    // REAL PI BROWSER FLOW (needs an approved Pi app):
+    try {
+      const auth = await window.Pi.authenticate(["username", "payments"], () => {});
+      store.wallet = { username: auth.user.username, address: auth.user.uid };
+      toast("Connected as @" + auth.user.username);
+    } catch (e) { toast("Pi authentication cancelled"); return; }
+  } else {
+    store.wallet = { username: "demo_pioneer", address: randomAddress() };
+    toast("Demo wallet connected");
+  }
+  openWallet();
+};
+
+$("depositBtn").onclick = async () => {
+  const amt = parseFloat($("depositAmt").value);
+  if (!(amt >= 0.1)) { toast("Minimum deposit is 0.1 π"); return; }
+  const w = store.wallet;
+  if (!w) return;
+
+  if (hasRealPi) {
+    // REAL PI PAYMENT (server-side approval/completion required):
+    window.Pi.createPayment(
+      { amount: amt, memo: "Deposit to Bawan Gambling", metadata: { user: w.username } },
+      {
+        onReadyForServerApproval: (paymentId) => console.log("approve on backend:", paymentId),
+        onReadyForServerCompletion: (paymentId, txid) => {
+          store.balance += amt; refreshUI(); toast(`Deposited ${amt} π (tx ${txid})`);
+        },
+        onCancel: () => toast("Payment cancelled"),
+        onError: () => toast("Payment error"),
+      }
+    );
+  } else {
+    store.balance += amt;
+    refreshUI();
+    toast(`Deposited ${amt} π (demo)`);
+  }
+  openWallet();
+};
+
+$("withdrawBtn").onclick = () => {
+  const amt = parseFloat($("withdrawAmt").value);
+  const w = store.wallet;
+  if (!w) return;
+  if (!(amt >= 1)) { toast("Minimum withdrawal is 1 π"); return; }
+  if (amt > store.balance) { toast("Amount exceeds balance"); return; }
+  store.balance -= amt;           // demo: instant, no blockchain
+  refreshUI();
+  toast(`Withdrawing ${amt} π to your Pi wallet (demo)`);
+  openWallet();
+};
+
+/* ---------- 6. Controls ---------- */
+$("spinBtn").onclick = spin;
+document.querySelectorAll(".chip").forEach((c) => {
+  c.onclick = () => {
+    $("betInput").value = c.dataset.bet === "max"
+      ? Math.min(MAX_BET, Math.max(MIN_BET, Math.floor(store.balance * 100) / 100))
+      : c.dataset.bet;
+  };
+});
+window.addEventListener("resize", () => { if (!spinning) drawWheel(); });
+
+/* ---------- 7. Init ---------- */
+$("oddsBody").innerHTML = SLICES
+  .slice()
+  .sort((a, b) => b.m - a.m)
+  .map((s) => `<tr>
+      <td><span class="swatch" style="background:${s.color}"></span><span class="mult">${s.label}</span></td>
+      <td class="num">${s.p}%</td>
+      <td class="num">${fmt(s.m)} π</td>
+    </tr>`)
+  .join("");
+
+refreshUI();
+drawWheel();
+</script>
+</body>
+</html>
